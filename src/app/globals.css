@@ -1,0 +1,121 @@
+/* # Filename: src/app/globals.css */
+
+@import "tailwindcss";
+
+/* next-themes writes class="light" or class="dark" onto <html>. Tailwind v4 points its
+   `dark:` variant at prefers-color-scheme by default, so it is re-aimed at that class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Raw token layer. Every colour in the app resolves to one of these names, so a theme is
+   nothing more than a different set of values for the same names. */
+:root {
+  --background: #faf9f8;
+  --surface: #ffffff;
+  --surface-raised: #fcfbfa;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+
+  --foreground: #1c1917;
+  --foreground-muted: #64748b;
+
+  --primary: #991b1b;
+  --primary-hover: #7f1d1d;
+  --primary-foreground: #ffffff;
+  --primary-soft: #fef2f2;
+
+  --status-normal: #15803d;
+  --status-normal-soft: #f0fdf4;
+  --status-normal-line: #bbf7d0;
+
+  --status-warning: #b45309;
+  --status-warning-soft: #fffbeb;
+  --status-warning-line: #fde68a;
+
+  --status-critical: #b91c1c;
+  --status-critical-soft: #fef2f2;
+  --status-critical-line: #fecaca;
+
+  --accent-teal: #0f766e;
+  --accent-blue: #2563eb;
+  --accent-amber: #b45309;
+
+  --ring: #991b1b;
+}
+
+.dark {
+  --background: #090909;
+  --surface: #111111;
+  --surface-raised: #181818;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+
+  --foreground: #f5f5f4;
+  --foreground-muted: #a8a29e;
+
+  --primary: #991b1b;
+  --primary-hover: #b91c1c;
+  --primary-foreground: #f5f5f4;
+  --primary-soft: #450a0a;
+
+  --status-normal: #4ade80;
+  --status-normal-soft: #0c1a11;
+  --status-normal-line: #1f3d2a;
+
+  --status-warning: #fbbf24;
+  --status-warning-soft: #1d1608;
+  --status-warning-line: #443413;
+
+  --status-critical: #dc2626;
+  --status-critical-soft: #450a0a;
+  --status-critical-line: #7f1d1d;
+
+  --accent-teal: #2dd4bf;
+  --accent-blue: #60a5fa;
+  --accent-amber: #fbbf24;
+
+  --ring: #dc2626;
+}
+
+/* Tailwind token layer. `inline` makes generated utilities emit var(--token) directly, so
+   swapping the .dark class re-colours the page without regenerating any CSS. */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-status-normal: var(--status-normal);
+  --color-status-normal-soft: var(--status-normal-soft);
+  --color-status-normal-line: var(--status-normal-line);
+
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-soft: var(--status-warning-soft);
+  --color-status-warning-line: var(--status-warning-line);
+
+  --color-status-critical: var(--status-critical);
+  --color-status-critical-soft: var(--status-critical-soft);
+  --color-status-critical-line: var(--status-critical-line);
+
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-amber: var(--accent-amber);
+
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
