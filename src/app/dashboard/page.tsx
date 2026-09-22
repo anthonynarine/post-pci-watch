@@ -6,12 +6,11 @@ import {
   CURRENT_VITALS,
   DeviceStatus,
   MONITORING_DEVICE,
+  MonitoringDataWorkspace,
   NOTEWORTHY_EVENTS,
   NoteworthyEvents,
   PatientSummary,
-  RECENT_MEASUREMENTS,
   RECOVERY_TIMELINE,
-  RecentMeasurements,
   RecoveryTimeline,
   SNAPSHOT_AT,
   SYNTHETIC_PATIENT,
@@ -33,7 +32,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <VitalsGrid readings={CURRENT_VITALS} />
-          <RecentMeasurements measurements={RECENT_MEASUREMENTS} />
+          <MonitoringDataWorkspace />
           <NoteworthyEvents events={NOTEWORTHY_EVENTS} />
         </div>
 

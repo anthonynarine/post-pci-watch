@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 
+import { ConvexClientProvider } from "@/components/convex/ConvexClientProvider";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
@@ -37,16 +38,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             request, so every Clerk component below it — on either side of the client
             boundary — reads the same auth state. */}
         <ClerkProvider>
-          <ThemeProvider>
-            <AppHeader />
-            <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-10">{children}</main>
-            <footer className="border-t border-border px-6 py-4">
-              <p className="mx-auto max-w-7xl text-xs text-foreground-muted">
-                Synthetic data only. Not a medical device and not for clinical
-                decision-making.
-              </p>
-            </footer>
-          </ThemeProvider>
+          {/* Convex sits inside Clerk so that Phase 4 can swap this for
+              ConvexProviderWithClerk, which needs Clerk's context to fetch a token. */}
+          <ConvexClientProvider>
+            <ThemeProvider>
+              <AppHeader />
+              <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-10">{children}</main>
+              <footer className="border-t border-border px-6 py-4">
+                <p className="mx-auto max-w-7xl text-xs text-foreground-muted">
+                  Synthetic data only. Not a medical device and not for clinical
+                  decision-making.
+                </p>
+              </footer>
+            </ThemeProvider>
+          </ConvexClientProvider>
         </ClerkProvider>
       </body>
     </html>

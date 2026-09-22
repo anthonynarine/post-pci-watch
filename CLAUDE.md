@@ -9,15 +9,22 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
 
 ## Project state
 
-- **Current phase: Phase 2 — Clerk Authentication.**
+- **Current phase: Phase 5 — Realtime Data.**
 - Phase 1 status: code complete. Its mastery check has not been answered in the learner's
   own words and stays open in `docs/PHASE_LOG.md`.
-- Phase 2 status: in progress. Clerk is installed and wired; `/` is public, `/dashboard`
-  protects itself with `await auth.protect()`.
-- Not yet permitted in the codebase: Convex, AI providers, PhysioNet, Synthea. Within
-  Clerk: no organizations, roles, or webhooks yet.
+- Phase 2 status: code complete and verified end to end. Its mastery check is also still
+  open.
+- Phase 3 status: code complete. Its mastery check is also still open.
+- Phase 4 status: code complete and verified. Its mastery check is also still open.
+- Phase 5 status: code complete. One manual control records a synthetic heart rate and the
+  subscribed table updates without a refresh. Single-client reactivity and cross-client push
+  are proven; the two-browser-tab test is blocked by S-20 and is not claimed.
+- Not yet permitted in the codebase: AI providers, PhysioNet, Synthea. Within Clerk: no
+  organizations, roles, or webhooks. Within Convex: no actions, no scheduled functions, no
+  HTTP endpoints.
 
 Phase completions and mastery checks are recorded in `docs/PHASE_LOG.md`.
+Security findings and their statuses are tracked in `docs/security/SECURITY_POSTURE.md`.
 
 ## Hard rules
 
@@ -53,3 +60,17 @@ auth concepts, databases, and backend architecture are already understood. The u
 the Next.js / Clerk / Convex ecosystem. Teach at that level: skip React fundamentals,
 explain the ecosystem from first principles, and aim for the learner being able to defend
 every architectural decision out loud.
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
