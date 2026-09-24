@@ -54,9 +54,15 @@ export const auditEventType = v.union(
   v.literal("patient.created"),
   v.literal("measurement.recorded"),
   v.literal("patientWorkspace.accessed"),
+  v.literal("simulator.started"),
+  v.literal("simulator.stopped"),
 );
 
-export const auditResourceType = v.union(v.literal("patient"), v.literal("measurement"));
+export const auditResourceType = v.union(
+  v.literal("patient"),
+  v.literal("measurement"),
+  v.literal("simulator"),
+);
 
 /**
  * Only one value, deliberately. A mutation that throws rolls back every write in it, so a
@@ -64,6 +70,24 @@ export const auditResourceType = v.union(v.literal("patient"), v.literal("measur
  * design cannot produce.
  */
 export const auditOutcome = v.literal("succeeded");
+
+/** The simulated wearer's activity. Drives which value ranges the simulator draws toward. */
+export const activityState = v.union(
+  v.literal("SLEEPING"),
+  v.literal("RESTING"),
+  v.literal("WALKING"),
+  v.literal("RECOVERY"),
+);
+
+export const simulatorStatus = v.union(v.literal("running"), v.literal("stopped"));
+
+/** Rule identifiers. Definitions live in convex/eventRules.ts; the schema only names them. */
+export const eventRuleId = v.union(
+  v.literal("heartRateAboveThreshold"),
+  v.literal("spo2BelowThresholdSustained"),
+);
+
+export const monitoringEventStatus = v.union(v.literal("open"), v.literal("closed"));
 
 export const monitoringStatus = v.union(
   v.literal("active"),
@@ -120,7 +144,64 @@ export default defineSchema({
     // Field order is the query order. patientId first narrows to one patient, observedAt
     // second orders within that patient, so "this patient's most recent N" is an index
     // range read rather than a scan of every measurement ever stored.
-    .index("by_patientId_and_observedAt", ["patientId", "observedAt"]),
+    .index("by_patientId_and_observedAt", ["patientId", "observedAt"])
+    // Per-vital reads: "latest heart rate" is one descending lookup, and a time window is a
+    // bounded range per vital instead of one range holding every vital interleaved.
+    .index("by_patientId_and_measurementType_and_observedAt", [
+      "patientId",
+      "measurementType",
+      "observedAt",
+    ]),
+
+  /**
+   * Deterministic rule episodes, derived from measurements in the same transaction that wrote
+   * them. One row per continuous run of qualifying readings. Derived data, never a substitute
+   * for the measurements it was computed from.
+   */
+  monitoringEvents: defineTable({
+    patientId: v.id("patients"),
+    ruleId: eventRuleId,
+    // Which rule definitions produced this row, so a later threshold change cannot silently
+    // reinterpret old events.
+    rulesVersion: v.string(),
+    status: monitoringEventStatus,
+    // observedAt of the first and latest qualifying readings; endedAt is the reading that
+    // broke the condition.
+    startedAt: v.number(),
+    lastObservedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    readingCount: v.number(),
+    // Highest value for an "above" rule, lowest for a "below" rule.
+    extremeValue: v.number(),
+    isSynthetic: v.literal(true),
+  })
+    // Evaluator: "is there an open episode of this rule for this patient?"
+    .index("by_patientId_and_ruleId_and_status", ["patientId", "ruleId", "status"])
+    // Dashboard: this patient's episodes, newest first.
+    .index("by_patientId_and_startedAt", ["patientId", "startedAt"]),
+
+  /**
+   * One simulated wearable per patient. Kept apart from `patients` because it changes every
+   * tick; putting it on the patient would make every tick rewrite the patient record and rerun
+   * every query that reads it.
+   *
+   * `vitals` and `targets` keep full precision so drift stays smooth; measurements store the
+   * rounded values a device would report.
+   */
+  simulators: defineTable({
+    patientId: v.id("patients"),
+    status: simulatorStatus,
+    activityState,
+    ticksInState: v.number(),
+    vitals: v.object({ heartRate: v.number(), spo2: v.number(), respiratoryRate: v.number() }),
+    targets: v.object({ heartRate: v.number(), spo2: v.number(), respiratoryRate: v.number() }),
+    startedAt: v.number(),
+    // Hard stop for the session, set at start. Bounds how many rows one session can write.
+    stopsAt: v.number(),
+    // The pending tick, so stop can cancel it. Absent when stopped.
+    nextTickId: v.optional(v.id("_scheduled_functions")),
+    isSynthetic: v.literal(true),
+  }).index("by_patientId", ["patientId"]),
 
   /**
    * Append-only evidence of successful actions. Written only through `recordAuditEvent` in
@@ -136,7 +217,7 @@ export default defineSchema({
     actorSubject: v.string(),
     eventType: auditEventType,
     resourceType: auditResourceType,
-    resourceId: v.optional(v.union(v.id("patients"), v.id("measurements"))),
+    resourceId: v.optional(v.union(v.id("patients"), v.id("measurements"), v.id("simulators"))),
     patientId: v.optional(v.id("patients")),
     occurredAt: v.number(),
     // Browser-generated, validated as a UUID. Groups events; grants nothing.

@@ -10,10 +10,14 @@
 
 import type * as audit from "../audit.js";
 import type * as authz from "../authz.js";
+import type * as eventRules from "../eventRules.js";
 import type * as fixtures from "../fixtures.js";
 import type * as measurements from "../measurements.js";
 import type * as migrations from "../migrations.js";
+import type * as monitoringEvents from "../monitoringEvents.js";
 import type * as patients from "../patients.js";
+import type * as simulator from "../simulator.js";
+import type * as simulatorModel from "../simulatorModel.js";
 
 import type {
   ApiFromModules,
@@ -24,10 +28,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   audit: typeof audit;
   authz: typeof authz;
+  eventRules: typeof eventRules;
   fixtures: typeof fixtures;
   measurements: typeof measurements;
   migrations: typeof migrations;
+  monitoringEvents: typeof monitoringEvents;
   patients: typeof patients;
+  simulator: typeof simulator;
+  simulatorModel: typeof simulatorModel;
 }>;
 
 /**

@@ -31,6 +31,11 @@ type AuditEventInput =
       eventType: "patientWorkspace.accessed";
       patientId: Id<"patients">;
       correlationId: string;
+    }
+  | {
+      eventType: "simulator.started" | "simulator.stopped";
+      patientId: Id<"patients">;
+      simulatorId: Id<"simulators">;
     };
 
 /**
@@ -40,6 +45,16 @@ type AuditEventInput =
 export async function requireUserActor(ctx: QueryCtx | MutationCtx): Promise<AuditActor> {
   return { actorType: "user", actorSubject: await requireSubject(ctx) };
 }
+
+/**
+ * The simulator, as an actor. A program has no Clerk session, so it is named by a fixed
+ * server-side constant and never by a `user_…` subject: an event it causes must not read as
+ * something a person did.
+ */
+export const WEARABLE_SIMULATOR_ACTOR: AuditActor = {
+  actorType: "system",
+  actorSubject: "system:wearable-simulator",
+};
 
 // crypto.randomUUID() output. Anything else — longer strings, embedded content — is refused.
 const CORRELATION_ID_PATTERN =
@@ -98,6 +113,15 @@ export async function recordAuditEvent(
         resourceType: "patient",
         resourceId: event.patientId,
         correlationId: event.correlationId,
+      });
+      return;
+
+    case "simulator.started":
+    case "simulator.stopped":
+      await ctx.db.insert("auditEvents", {
+        ...base,
+        resourceType: "simulator",
+        resourceId: event.simulatorId,
       });
       return;
   }

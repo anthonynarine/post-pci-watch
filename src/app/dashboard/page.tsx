@@ -3,19 +3,15 @@ import { auth } from "@clerk/nextjs/server";
 
 import {
   ClinicianReview,
-  CURRENT_VITALS,
   DeviceStatus,
   MONITORING_DEVICE,
   MonitoringDataWorkspace,
-  NOTEWORTHY_EVENTS,
-  NoteworthyEvents,
   PatientSummary,
   RECOVERY_TIMELINE,
   RecoveryTimeline,
   SNAPSHOT_AT,
   SYNTHETIC_PATIENT,
   SyntheticDataNotice,
-  VitalsGrid,
 } from "@/features/monitoring";
 
 export default async function DashboardPage() {
@@ -31,9 +27,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <VitalsGrid readings={CURRENT_VITALS} />
           <MonitoringDataWorkspace />
-          <NoteworthyEvents events={NOTEWORTHY_EVENTS} />
         </div>
 
         <div className="space-y-6">

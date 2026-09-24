@@ -9,8 +9,8 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
 
 ## Project state
 
-- **Current phase: Phase 5.5 — Security, Provenance, and Audit Foundation** (inserted by the
-  project owner outside the roadmap; code complete, stopped at its end). Phase 6 has not begun.
+- **Current phase: Phase 16 — Production and Deployment** (next). Phases 6, 7, and 10 are code
+  complete; Phases 8 and 9 were skipped under the finish scope.
 - Phase 1 status: code complete. Its mastery check has not been answered in the learner's
   own words and stays open in `docs/PHASE_LOG.md`.
 - Phase 2 status: code complete and verified end to end. Its mastery check is also still
@@ -33,18 +33,29 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
   Append-only `auditEvents` written atomically with successful writes; one client-declared
   workspace-access event per workspace mount; owner-scoped "Synthetic activity history"
   panel; measurement `origin` required and fixture provenance corrected. S-05 is **Partial**,
-  not resolved; new finding S-21. The panel and access effect are not yet observed in a live
-  browser.
+  not resolved; new finding S-21. The panel and one-event-per-mount access were observed in the
+  owner's browser.
 - 2026-09-24: the owner **waived the Phase 5 and Phase 5.5 mastery checks** to prioritise
-  finishing the application. Waived, not answered. Phase 6 is unblocked by that decision.
+  finishing the application. Waived, not answered.
+- **Finish scope (owner decision, 2026-09-24): a deployed demo** — Phases 6, 7, 10, 16, 17.
+  Phases 8, 9, 11–15 are out of scope for this finish, not done.
+- Phase 6 status: code complete and verified by injected-identity tests. Server-side
+  simulator on Convex's scheduler, started and stopped from the dashboard, auto-stops after
+  15 minutes.
+- Phase 7 status: code complete and verified. Live current vitals and 5-minute / 1-hour window
+  summaries from stored data; the hardcoded vitals cards are removed.
+- Phase 10 status: code complete and verified. Versioned deterministic rules (`rules-v1`)
+  evaluated in the writing transaction; the hardcoded events card is removed. The
+  measurement-gap condition is computed on screen and not stored.
 - Outside the roadmap: a public teaching library at `/learn` (`src/features/learning/`).
   It is not a phase and does not advance or close one. Add articles as described in
   `docs/concepts/teaching-section.md` §5. Every article's claims are verified against the
   installed versions and official docs. When a Convex, Clerk, or Next.js upgrade lands,
   recheck `src/features/learning/data/` and the article's `verifiedAgainst`.
 - Not yet permitted in the codebase: AI providers, PhysioNet, Synthea. Within Clerk: no
-  organizations, roles, or webhooks. Within Convex: no actions, no scheduled functions, no
-  HTTP endpoints.
+  organizations, roles, or webhooks. Within Convex: no actions, no crons, no HTTP endpoints.
+  Scheduled functions (`ctx.scheduler`) are permitted **only** for the Phase 6 simulator loop
+  in `convex/simulator.ts` — owner decision, 2026-09-24.
 
 Phase completions and mastery checks are recorded in `docs/PHASE_LOG.md`.
 Security findings and their statuses are tracked in `docs/security/SECURITY_POSTURE.md`.

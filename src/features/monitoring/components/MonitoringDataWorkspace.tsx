@@ -14,9 +14,13 @@ import { Card } from "@/components/ui/Card";
 import { useRecordPatientWorkspaceAccess } from "../hooks/useRecordPatientWorkspaceAccess";
 import type { Measurement } from "../types/monitoring";
 import { LiveConnectionLost } from "./LiveConnectionLost";
+import { LiveMonitoringEvents } from "./LiveMonitoringEvents";
+import { LiveVitals } from "./LiveVitals";
 import { RecentMeasurements } from "./RecentMeasurements";
 import { RecordSyntheticHeartRate } from "./RecordSyntheticHeartRate";
+import { SimulatorControl } from "./SimulatorControl";
 import { SyntheticActivityHistory } from "./SyntheticActivityHistory";
+import { WindowSummary } from "./WindowSummary";
 
 /**
  * The dashboard's only Client Component. It is one because `useQuery` holds a live WebSocket
@@ -190,7 +194,9 @@ export function MonitoringDataWorkspace() {
   if (measurements.length === 0) {
     return (
       <div className="space-y-4">
-        <RecordSyntheticHeartRate patientId={patient._id} />
+        <SimulatorControl patientId={patient._id} />
+        <SimulatorControl patientId={patient._id} />
+      <RecordSyntheticHeartRate patientId={patient._id} />
         <WorkspaceNotice title="No measurements recorded">
           {patient.name} exists, but no observations are stored for this patient yet.
         </WorkspaceNotice>
@@ -204,6 +210,10 @@ export function MonitoringDataWorkspace() {
   // useQuery above already opened.
   return (
     <div className="space-y-4">
+      <LiveVitals patientId={patient._id} />
+      <WindowSummary patientId={patient._id} />
+      <LiveMonitoringEvents patientId={patient._id} />
+      <SimulatorControl patientId={patient._id} />
       <RecordSyntheticHeartRate patientId={patient._id} />
       <RecentMeasurements measurements={measurements.map(toMeasurementRow)} />
       <SyntheticActivityHistory />

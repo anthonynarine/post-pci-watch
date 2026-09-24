@@ -25,6 +25,8 @@ const EVENT_LABELS: Record<Doc<"auditEvents">["eventType"], string> = {
   "patient.created": "Created synthetic demo patient",
   "measurement.recorded": "Recorded synthetic heart rate",
   "patientWorkspace.accessed": "Opened patient workspace",
+  "simulator.started": "Started synthetic wearable simulator",
+  "simulator.stopped": "Stopped synthetic wearable simulator",
 };
 
 // Same fixed UTC layout as the measurements table, for the same reason: a locale-formatted

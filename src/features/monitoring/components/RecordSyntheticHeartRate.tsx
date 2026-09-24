@@ -64,13 +64,12 @@ export function RecordSyntheticHeartRate({ patientId }: { patientId: Id<"patient
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-medium text-foreground">
             <FlaskConical aria-hidden="true" className="size-4 text-primary" />
-            Phase 5 demonstration — manual entry
+            Manual entry
           </p>
           <p className="mt-1 text-xs text-foreground-muted">
-            Writes one fabricated heart-rate value to Convex. There is no wearable, no device,
-            and no simulator connected. The table below updates through its existing
-            subscription, without a page refresh. The value is a made-up number and carries no
-            clinical meaning.
+            Writes one fabricated heart-rate value by hand, separately from the simulator. The
+            table below updates through its existing subscription, without a page refresh. The
+            value is a made-up number and carries no clinical meaning.
           </p>
         </div>
 

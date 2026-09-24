@@ -10,10 +10,13 @@ export function NoteworthyEvents({ events }: { events: MonitoringEvent[] }) {
   return (
     <Card
       title="Noteworthy events"
-      description="Produced by explicit software rules over the measurements above. Not measurements, and not model output."
+      description="Produced by explicit software rules over the stored measurements. Not measurements, and not model output. Thresholds are demo configuration, not clinical limits."
       icon={SquareFunction}
       action={<StatusBadge tone="neutral" label={`${events.length} in window`} />}
     >
+      {events.length === 0 ? (
+        <p className="text-xs text-foreground-muted">No rule has fired for this patient.</p>
+      ) : null}
       <ul className="space-y-3">
         {events.map((event) => (
           <li

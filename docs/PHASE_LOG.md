@@ -414,6 +414,100 @@ The Phase 5 mastery check above also remains open.
   Waived, not answered: no answers were given and none are recorded. Hard rule 1 was set aside
   by the owner's decision to prioritise finishing the application.
 
+## Phase 6 — Synthetic Wearable Simulator
+
+**Goal:** a producer for heart rate, SpO₂, respiratory rate, and activity state, moving between
+`RESTING`, `WALKING`, `SLEEPING`, and `RECOVERY` through plausible transitions — not
+unrestricted randomness.
+
+**Owner decisions, 2026-09-24:** finish scope is a deployed demo (Phases 6, 7, 10, 16, 17);
+the simulator is driven by Convex's scheduler, which lifts the scheduled-function restriction
+for this loop only.
+
+**Concept reference:** [`docs/concepts/phase-06-simulator.md`](concepts/phase-06-simulator.md)
+
+**Notes**
+
+- 2026-09-24 — `convex/simulatorModel.ts` (pure model), `convex/simulator.ts` (`start`,
+  `stop`, `getForPatient`, internal `tick`), `simulators` table, audit vocabulary widened with
+  `simulator.started` / `simulator.stopped` and a `simulator` resource. First use of the
+  system actor `system:wearable-simulator`, for auto-stop.
+
+- 2026-09-24 — Dashboard gains `SimulatorControl`. The manual heart-rate control's text claimed
+  "no simulator connected"; corrected now that one exists.
+
+- 2026-09-24 — Verified with injected identities: signed-out start refused; cross-owner start
+  and stop refused; double start yields one chain; `tick` unreachable by a signed-in caller;
+  five ticks at exact 5 s intervals, 3 rows each, with `systemProducer` provenance; stop ends
+  the chain with no further rows; start/stop audited as the user. `tsc` and lint clean.
+
+## Phase 7 — Time-Series Architecture
+
+**Goal:** current status, last 5 minutes, and last hour from stored data, with appropriate
+indexes and query windows.
+
+**Concept reference:** [`docs/concepts/phase-07-time-windows.md`](concepts/phase-07-time-windows.md)
+
+**Notes**
+
+- 2026-09-24 — Index `by_patientId_and_measurementType_and_observedAt`; queries
+  `measurements:getCurrentVitals` and `measurements:summarizeWindow` (client-supplied `since`,
+  1,000-row cap per vital with a `truncated` flag). `useNow` clock hook; `LiveVitals` and
+  `WindowSummary` components.
+
+- 2026-09-24 — The hardcoded `VitalsGrid` / `CURRENT_VITALS` cards are removed from the
+  dashboard: they showed fixture values, including a "Below threshold" label no rule
+  produced, beside live data that contradicted them.
+
+- 2026-09-24 — Verified with injected identities: current vitals and both windows correct
+  against known simulator and manual rows; cross-owner reads refused; non-numeric `since`
+  rejected. `tsc` and lint clean.
+
+## Phase 10 — Deterministic Event Detection
+
+Phases 8 and 9 (PhysioNet, synthetic clinical context) are outside the owner's finish scope and
+were skipped, not done.
+
+**Goal:** explicit software rules for noteworthy events — deterministic, not AI conclusions.
+
+**Concept reference:** [`docs/concepts/phase-10-event-detection.md`](concepts/phase-10-event-detection.md)
+
+**Notes**
+
+- 2026-09-24 — `convex/eventRules.ts` (versioned rule configuration and evaluator),
+  `monitoringEvents` table (episodes: open / extend / close), `monitoringEvents:listForPatient`.
+  Evaluation runs inside `tick` and `recordSyntheticHeartRate`, after the insert, in the same
+  transaction.
+
+- 2026-09-24 — Rules `rules-v1`: heart rate > 100 bpm × 3 readings; SpO₂ < 95 % × 12 readings.
+  Demo configuration, not clinical limits. The measurement-gap condition is computed on the
+  dashboard and not persisted, because an absence of writes cannot trigger a write.
+
+- 2026-09-24 — The hardcoded `NOTEWORTHY_EVENTS` card is replaced by `LiveMonitoringEvents`.
+
+- 2026-09-24 — Heart-rate rule verified deterministically (open, extend, close, no false open
+  on 2 of 3, cross-owner read refused). `tsc` and lint clean.
+
+## Phase 16 — Production and Deployment
+
+Phases 11–15 (AI, grounding, human review, failure modes, testing) are outside the owner's
+finish scope and were skipped, not done.
+
+**Goal:** deploy with Vercel, Clerk, and Convex; separate environments; keep secrets where they
+belong.
+
+**Concept reference:** [`docs/concepts/phase-16-deployment.md`](concepts/phase-16-deployment.md)
+
+**Owner decisions, 2026-09-24:** use the Clerk development instance for the deployed demo (no
+owned domain; recorded as S-22); merge to `main` and deploy `main` on Vercel.
+
+**Notes**
+
+- 2026-09-24 — `vercel.json` sets the build command
+  `npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL`.
+  Owner-only steps (Convex production env var and deploy key, Vercel account, environment
+  variables) are listed in the concept reference §4. **Not yet deployed.**
+
 ## Outside the Roadmap — Teaching Section
 
 Not a phase. It adds no technology, no dependency, and no backend code, and it neither

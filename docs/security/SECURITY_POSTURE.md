@@ -74,7 +74,7 @@ Partial, Open (confirmed absent), Unknown (not determinable in this audit), N/A.
 | S-01 | High → Low | **Resolved (dev)** | Security headers and CSP deployed and verified end to end | No (dev) |
 | S-02 | Medium | Proven | Convex JWT lifetime is 3600s — revocation lag up to one hour | **Yes** |
 | S-03 | Medium | Open | No application-level rate limiting or abuse controls | **Yes** |
-| S-04 | Medium | Open | No environment separation; development instances only | **Yes** |
+| S-04 | Medium | **Partial** | Separate Convex dev and prod deployments (Phase 16); Clerk instance still shared (S-22) | **Yes** |
 | S-05 | Medium | **Partial** | Successful writes audited atomically; workspace access client-declared; denials and reads not durably audited; no tamper evidence | **Yes** |
 | S-06 | Medium | Open | No retention, deletion, or data-subject erasure path | **Yes** |
 | S-07 | Medium | Open | No backup, restore drill, or incident-response plan | **Yes** |
@@ -90,6 +90,7 @@ Partial, Open (confirmed absent), Unknown (not determinable in this audit), N/A.
 | S-17 | Medium | Open | HSTS never served over a real HTTPS origin | **Yes** |
 | S-18 | Medium | Open | No CSP violation reporting endpoint | **Yes** |
 | S-19 | Low | Open | CSP still relies on `'unsafe-inline'`; no nonce | Partial |
+| S-22 | Medium | Open | Deployed demo uses Clerk's development instance (no owned domain) | **Yes** |
 | S-21 | Low | Open | Identity key is `identity.subject`, not `identity.tokenIdentifier`; safe only while one issuer is trusted | No |
 | S-20 | Medium | **Partially remediated; deferred by owner; not closed** | Clerk `getToken` fails `clerk_offline` on a false `navigator.onLine`; failure now reported and bounded recovery added, but recovery is unverified and the trigger is this machine's Windows network services | **Yes** |
 
@@ -1084,6 +1085,26 @@ was never exercised.** It is implemented and reviewed, not proven.
    it would mean the false offline flag was masking a second, independent defect.
 
 Until 1 and 2 pass, this finding stays open and Phase 5 stays open.
+
+---
+
+### S-22 — Deployed demo uses Clerk's development instance
+
+**Severity:** Medium · **Status:** Open · **Blocks PHI:** **Yes** · **Discovered:** 2026-09-24
+(Phase 16, owner decision)
+
+**Evidence:** a Clerk production instance requires a domain the owner controls, and
+`*.vercel.app` does not qualify. The owner chose to deploy the demo with the existing
+development instance (`electric-fowl-7803.clerk.accounts.dev`), shared with local development.
+
+**Consequences:** development-mode badge and user limits; Google sign-in uses Clerk's shared
+development OAuth credentials; one user pool across development and the demo, so a development
+account can sign in to the deployed demo and vice versa. Convex data stays separate — the same
+Clerk subject owns different records in each Convex deployment.
+
+**Recommendation:** before any audience beyond a demo, register a domain, create a Clerk
+production instance with its own OAuth credentials, and point the production Convex deployment's
+`CLERK_FRONTEND_API_URL` at it.
 
 ---
 
