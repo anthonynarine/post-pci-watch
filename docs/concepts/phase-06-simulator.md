@@ -140,7 +140,13 @@ after stop                            no further rows
 audit                                 simulator.started, simulator.stopped as user_AAA
 ```
 
-Auto-stop: see `PHASE_LOG.md` for the result of the full 15-minute session.
+Auto-stop, on a full session for user B:
+
+```text
+started 19:33:32Z → stopped itself at 19:48:34Z, the first tick after stopsAt
+audit              simulator.stopped as system / system:wearable-simulator
+rows               540 (cap 543)
+```
 
 ---
 

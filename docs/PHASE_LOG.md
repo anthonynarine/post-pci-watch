@@ -441,6 +441,10 @@ for this loop only.
   five ticks at exact 5 s intervals, 3 rows each, with `systemProducer` provenance; stop ends
   the chain with no further rows; start/stop audited as the user. `tsc` and lint clean.
 
+- 2026-09-24 — **Auto-stop verified** on a full session: started 19:33:32Z, stopped itself at
+  19:48:34Z (first tick after `stopsAt`), audited as `system/system:wearable-simulator`, 540 rows
+  written (cap 543).
+
 ## Phase 7 — Time-Series Architecture
 
 **Goal:** current status, last 5 minutes, and last hour from stored data, with appropriate
@@ -487,6 +491,10 @@ were skipped, not done.
 
 - 2026-09-24 — Heart-rate rule verified deterministically (open, extend, close, no false open
   on 2 of 3, cross-owner read refused). `tsc` and lint clean.
+
+- 2026-09-24 — The heart-rate rule also fired from real simulator output: one closed episode, 5
+  readings, peak 103 bpm (WALKING). The SpO₂ rule shares the evaluator but **has not been
+  observed firing**: the model rarely holds SpO₂ < 95 % for 12 consecutive readings.
 
 ## Phase 16 — Production and Deployment
 
