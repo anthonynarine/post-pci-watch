@@ -690,6 +690,18 @@ data.
 
 ---
 
+#### 2026-09-24 — Keys exposed during the Phase 16 deployment
+
+The Convex **production** deploy key (`rosy-pigeon-94`) and the Clerk development instance's
+**secret key** were pasted into the assistant session transcript while configuring Vercel. The
+owner chose to proceed and rotate afterwards. Until rotated, anyone with the transcript could push
+code to Convex production (the key's scope was recommended as `deployment:deploy` only; not
+verified) and administer the Clerk development instance. **Rotate both before any wider
+audience**: Convex → Production → Settings → Deploy Keys; Clerk → API Keys → Secret keys; then
+update Vercel and `.env.local`.
+
+---
+
 ### S-12 — Cookie attributes unverified; development over plaintext HTTP
 
 **Severity:** Low (here) · **Status:** Unknown · **Blocks PHI:** **Yes**

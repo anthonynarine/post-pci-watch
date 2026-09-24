@@ -9,8 +9,10 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
 
 ## Project state
 
-- **Current phase: Phase 16 — Production and Deployment** (next). Phases 6, 7, and 10 are code
-  complete; Phases 8 and 9 were skipped under the finish scope.
+- **Current phase: Phase 17 — Demo Polish** (next). Phase 16 deployed and verified end to end
+  on 2026-09-24: Vercel + Convex production `rosy-pigeon-94` + Clerk development instance
+  (S-22). The Convex deploy key and Clerk secret key were exposed in a session transcript and
+  must be rotated (S-11). Phases 8, 9, 11–15 were skipped under the finish scope.
 - Phase 1 status: code complete. Its mastery check has not been answered in the learner's
   own words and stays open in `docs/PHASE_LOG.md`.
 - Phase 2 status: code complete and verified end to end. Its mastery check is also still

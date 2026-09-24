@@ -514,7 +514,22 @@ owned domain; recorded as S-22); merge to `main` and deploy `main` on Vercel.
 - 2026-09-24 — `vercel.json` sets the build command
   `npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL`.
   Owner-only steps (Convex production env var and deploy key, Vercel account, environment
-  variables) are listed in the concept reference §4. **Not yet deployed.**
+  variables) are listed in the concept reference §4.
+
+- 2026-09-24 — **Deployed.** Vercel project (Hobby) built `main`; Convex production
+  `rosy-pigeon-94` received the schema (5 tables) and functions. `CLERK_FRONTEND_API_URL` set on
+  production; `CONVEX_DEPLOY_KEY` scoped to Production only in Vercel.
+
+- 2026-09-24 — **Verified end to end in production** from production data: a real Clerk session
+  was verified by Convex production (`patient.created`, `patientWorkspace.accessed`,
+  `measurement.recorded`, `simulator.started`, all actor `user`), and the scheduler wrote
+  `systemProducer` rows server-side. The owner's browser then showed `LiveConnectionLost` with
+  the offline flag — S-20 on this machine (Windows still holds no network profile), not a
+  deployment defect. Not yet observed on a second device.
+
+- 2026-09-24 — **Secrets exposed in the session transcript:** the Convex production deploy key
+  and the Clerk development secret key were pasted into chat. The owner chose to proceed and
+  rotate later. Recorded under S-11; rotate both before any wider audience.
 
 ## Outside the Roadmap — Teaching Section
 
