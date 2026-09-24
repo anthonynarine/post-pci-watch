@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
+import { recordAuditEvent, requireUserActor } from "./audit";
 import { requireOwnedPatient } from "./authz";
 import schema from "./schema";
 
@@ -70,8 +71,10 @@ export const recordSyntheticHeartRate = mutation({
     observedAt: v.number(),
   }),
   handler: async (ctx, args) => {
-    // Step 1: authenticate and authorize in one call, before anything is written. Throws
-    // identically for a patient that does not exist and one owned by someone else.
+    // Step 1: authenticate, then authorize, before anything is written. The actor comes from
+    // the verified token; ownership throws identically for a missing patient and someone
+    // else's.
+    const actor = await requireUserActor(ctx);
     const patient = await requireOwnedPatient(ctx, args.patientId);
 
     // Step 2: refuse to attach synthetic readings to a record that does not declare itself
@@ -114,8 +117,18 @@ export const recordSyntheticHeartRate = mutation({
       ingestedAt: now,
       sourceDeviceId: MANUAL_SOURCE_DEVICE_ID,
       sourceType: "manualEntry",
+      origin: "userManualControl",
       isSynthetic: true,
     });
+
+    // Step 5: the audit event, in the same transaction. Every check above has already passed
+    // or thrown, so a rejected call leaves neither this row nor the measurement behind.
+    await recordAuditEvent(
+      ctx,
+      actor,
+      { eventType: "measurement.recorded", patientId: args.patientId, measurementId },
+      now,
+    );
 
     return { measurementId, value: args.value, observedAt: now };
   },

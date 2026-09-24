@@ -9,7 +9,7 @@ learner in their own words. Roadmap and phase contents live in `PROJECT_SOURCE.m
 | 2 | Clerk Authentication | Code complete, mastery check open | — |
 | 3 | Convex Foundation | Code complete, mastery check open | — |
 | 4 | Clerk and Convex Identity | Code complete, mastery check open | — |
-| 5 | Realtime Data | Code complete, two-tab test blocked | — |
+| 5 | Realtime Data | Code complete, two-tab test still blocked (S-20) | — |
 | 6 | Synthetic Wearable Simulator | Not started | — |
 | 7 | Time-Series Architecture | Not started | — |
 | 8 | PhysioNet | Not started | — |
@@ -299,6 +299,40 @@ without a page refresh. No simulator, no interval, no scheduler.
   `docs/security/SECURITY_POSTURE.md`. Phase 5's two-tab reactivity claim stays unproven
   until the remediation lands and the two-tab test passes.
 
+- 2026-09-23 — S-20 remediation items 1 and 2 applied; **the phase did not close.**
+  `ConvexClientProvider` now uses `ConvexProviderWithAuth` with a copy of Clerk's token
+  fetcher carrying one extra dependency, so a recovery counter can rebuild it and re-run
+  `setAuth()` on the same single `ConvexReactClient`. A new `LiveConnectionLost` component
+  replaces the measurement table and the write control when authentication has definitively
+  failed, and `MonitoringDataWorkspace` now distinguishes four states instead of two. The
+  3600-second JWT lifetime is unchanged.
+
+- 2026-09-23 — A defect in the first version of that fix was caught by testing rather than
+  by review: Convex's cleanup turns an already-`false` auth state into `null`, so a failed
+  re-attempt put the page back into an indefinite "Authenticating with Convex…" — the exact
+  misreport the work was meant to remove. Replaced with an explicit boolean record of
+  whether the last token fetch returned a token, tested before `isLoading`.
+
+- 2026-09-23 — **The acceptance test did not pass and Phase 5 stays open.** The disconnected
+  state reports correctly and idles with zero network requests over 25 seconds, proving no
+  polling and no retry loop. But two tabs still cannot hold authentication at once: reloading
+  either tab authenticates it and disconnects the other, deterministically, both directions.
+  The bounded recovery path was never exercised, because the browser produced no
+  offline-to-online transition to exercise it. Root environmental cause found: the Windows
+  `NlaSvc` service is stopped, so `navigator.onLine` is permanently false while the network
+  works. Evidence and the close-out conditions are in
+  [`docs/security/SECURITY_POSTURE.md`](security/SECURITY_POSTURE.md) under S-20.
+
+- 2026-09-23 — Phase 5 concept reference extended with section 14, recording the amplifier
+  in the dependency array, why the UI cannot read `isLoading` to detect failure, the four
+  states, and the bound on the recovery trigger.
+
+- 2026-09-24 — S-20 acceptance re-run blocked by this machine's Windows network services
+  (details in `docs/security/SECURITY_POSTURE.md`, 2026-09-24 entry). The project owner
+  **deferred S-20 as environmental** and chose to proceed. The two-tab claim remains
+  **unclaimed**, and the bounded recovery remains **unverified**. Phase 6 still waits on the
+  mastery check below.
+
 **Mastery check (must be answered before Phase 6)**
 
 Explain in your own words:
@@ -312,3 +346,111 @@ Explain in your own words:
 5. A write lands for a different patient. Why does this patient's subscription not rerun?
 6. Why is a single manual click better evidence of reactivity than a simulator producing a
    value every five seconds?
+
+## Phase 5.5 — Security, Provenance, and Audit Foundation
+
+**Inserted by the project owner, outside the roadmap in `PROJECT_SOURCE.md`.** Begun with the
+Phase 5 mastery check unanswered, by owner decision — hard rule 1 was waived by the owner, not
+satisfied. Phase 6 (the simulator) has not begun.
+
+**State carried in, unchanged:** Phase 5 reactivity proven for one browser client and an
+independent CLI subscriber; the two-tab claim unproven; S-20 open and deferred; all data
+synthetic; no HIPAA compliance claimed.
+
+**Goal:** server-controlled measurement provenance, atomic audit evidence for successful
+writes, one client-declared workspace-access event per workspace session, and an owner-scoped
+activity view — with nothing an actor could forge.
+
+**Concept reference:** [`docs/concepts/phase-05-5-security-audit-foundation.md`](concepts/phase-05-5-security-audit-foundation.md)
+
+**Notes**
+
+- 2026-09-24 — `auditEvents` table added: literal-union vocabulary, references only, two
+  indexes each backing a real read. `convex/audit.ts` holds the narrow helpers
+  (`requireUserActor`, `requireValidCorrelationId`, `recordAuditEvent`) and two public
+  functions, `recordPatientWorkspaceAccess` and `listMyRecentEvents`. No update or delete
+  exists.
+
+- 2026-09-24 — `recordSyntheticHeartRate` and `ensureMyDemoPatient` now write their audit
+  event in the same transaction as the record. Existing patients receive no back-dated
+  `patient.created`.
+
+- 2026-09-24 — **Provenance corrected.** The 36 fixture rows claimed `simulatedWearable` /
+  `sim-wearable-01`; no simulator has existed. Staged migration: before 65 rows / 65 missing
+  `origin` / 36 stale labels; after 36 `seedFixture`, 29 `userManualControl`, 0 missing, 0
+  stale; re-run a no-op; `origin` made required; temporary functions removed. No actor was
+  invented for historical manual rows.
+
+- 2026-09-24 — Authorization verification with injected identities: all 10 required checks
+  passed, plus `patient.created` and stored-field checks. Detail in the concept reference §12
+  and `SECURITY_POSTURE.md`. S-05 → **Partial**. New finding **S-21** (Low): identity keyed
+  on `subject`, not `tokenIdentifier`.
+
+- 2026-09-24 — `npx tsc --noEmit` clean · `npm run lint` clean · `npm run build` succeeds.
+
+- 2026-09-24 — **Observed in the owner's browser:** the "Synthetic activity history" panel
+  renders with its label and disclaimer and no identifiers. Two "Opened patient workspace"
+  rows at 19:21:38Z and 19:22:04Z carry different correlation IDs — two workspace mounts,
+  one event each, as designed. **Not yet observed in a browser:** a "Recorded synthetic heart
+  rate" row appearing without a refresh (proven server-side only).
+
+**Mastery check (must be answered before Phase 6)**
+
+Explain in your own words:
+`token → actor → ownership → validation → record + audit event → one commit`.
+
+1. Why can the measurement and its audit event never disagree, and what would break that?
+2. Why is there no `"denied"` outcome, and what would it take to add one honestly?
+3. Why does a `patientWorkspace.accessed` event prove something when present but nothing when
+   absent?
+4. The workspace effect runs twice. Why is there still one event, and which part guarantees
+   it?
+5. Why may the browser send a correlation ID but never an actor?
+6. Why was relabelling 36 synthetic fixture rows a correctness fix and not a cosmetic one?
+
+The Phase 5 mastery check above also remains open.
+
+- 2026-09-24 — **Mastery checks waived by the project owner** — Phase 5 and Phase 5.5 both.
+  Waived, not answered: no answers were given and none are recorded. Hard rule 1 was set aside
+  by the owner's decision to prioritise finishing the application.
+
+## Outside the Roadmap — Teaching Section
+
+Not a phase. It adds no technology, no dependency, and no backend code, and it neither
+advances nor closes any phase. Phase 5 remains the current phase, and every mastery check
+above remains open.
+
+**Concept reference:** [`docs/concepts/teaching-section.md`](concepts/teaching-section.md)
+
+**Notes**
+
+- 2026-09-23 — Public teaching library added at `/learn`, with one dynamic route
+  `/learn/[slug]` generated from a typed catalogue (`src/features/learning/data/articles.ts`).
+  First article: *How Next.js, Clerk, and Convex Handle One Request*
+  (`/learn/next-clerk-convex-request-pipeline`), 16 sections. Content is typed metadata plus
+  composed Server Component sections; MDX was rejected as an unjustified new dependency.
+- 2026-09-23 — Claims verified against convex 1.46.0's installed types and client source,
+  @clerk/nextjs 7.9.4, next 16.3.5, and official Convex, Clerk, and Next.js docs. Findings
+  worth keeping: in this Convex version `QueryCtx` and `MutationCtx` carry `runQuery`, and
+  `MutationCtx` carries `runMutation`; `api` and `internal` are the same runtime proxy, and
+  visibility is enforced by types and by the deployment; the scheduler accepts only mutations
+  and actions; a successful mutation's promise resolves only after the matching query
+  transition is applied (read from source; not a documented guarantee); Convex's docs call
+  client-to-action calls usually an anti-pattern.
+- 2026-09-23 — Three Client Component islands only: `FunctionTypeExplorer`,
+  `PipelineExplorer`, and the header's `NavLink`. Neither explorer calls a backend function.
+- 2026-09-23 — Shared changes: `AppHeader` gains a public "Learn" link, and its control
+  group now wraps. At 390 px it previously pushed the page 204 px wider than the screen.
+  `globals.css` gains one token, `--primary-text`, because dark `--primary` failed contrast
+  as small text. No change to Clerk, Convex auth, the S-20 remediation, monitoring behaviour,
+  or the CSP.
+- 2026-09-23 — Lint, `tsc --noEmit`, and build clean (7 routes). Browser-verified in light
+  and dark, signed in and signed out, keyboard-driven, at 390, 768, and 1280 px with no page
+  overflow. `/dashboard` is unchanged. Observed but out of scope: Clerk's development
+  telemetry to `clerk-telemetry.com` is blocked by the existing CSP in a signed-out session.
+  The pre-existing header "Synthetic data" badge still has low dark-mode contrast.
+- 2026-09-23 — Practice mode added at `/learn/[slug]/practice`: 21 items for Article 01 across
+  recall, discrimination, bug-hunt, and sequencing cards, scheduled by a five-box Leitner
+  system with topic interleaving and confidence ratings. Progress lives in per-browser
+  `localStorage` only; no backend change. Scoring well in practice does not answer a phase
+  mastery check.

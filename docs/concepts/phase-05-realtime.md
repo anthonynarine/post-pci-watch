@@ -363,3 +363,125 @@ The principles:
 5. Optimistic UI would have made the demonstration prove nothing.
 6. One manual write is better evidence than a stream.
 7. Proving the mechanism for one client is not proving it for two.
+
+---
+
+## 14. The S-20 Remediation — Reporting Failure and Bounded Recovery
+
+Added 2026-09-23, after S-20 was diagnosed. This section records the mechanism; it does not
+claim the two-tab test now passes. It does not.
+
+### The amplifier, precisely
+
+`ConvexProviderWithClerk` is a thin wrapper. Its whole body builds one callback:
+
+```ts
+const fetchAccessToken = useCallback(async ({ forceRefreshToken }) => {
+  try {
+    return await getToken({ template: "convex", skipCache: forceRefreshToken });
+  } catch {
+    return null;                    // the throw disappears here
+  }
+}, [orgId, orgRole, sessionId]);    // and nothing else can rebuild it
+```
+
+`ConvexProviderWithAuth` re-runs `client.setAuth(...)` when `fetchAccessToken` changes
+identity — its own comment says so: *"Build a new fetchAccessToken to trigger setAuth()
+whenever these change."* So the dependency array is the complete list of reasons the
+application will ever try again. Organisation, role, and session id do not change during a
+network blip. One failed fetch is therefore permanent.
+
+The fix has to be in that array. Nothing else in the chain has a say.
+
+### What replaced it
+
+`ConvexProviderWithAuth` is the documented integration point for any auth provider, and
+`ConvexProviderWithClerk` is built on it. `ConvexClientProvider` now calls it directly with a
+near-copy of Clerk's fetcher and one extra dependency, `attempt`:
+
+```ts
+[orgId, orgRole, sessionId, attempt, reportTokenFetch]
+```
+
+Incrementing `attempt` is one authentication re-attempt, through the provider's own
+lifecycle. The alternative — remounting `ConvexProviderWithClerk` with a `key` — also works,
+but it unmounts everything below the provider, closing and reopening every subscription and
+remounting the theme. Changing one dependency is narrower.
+
+The `ConvexReactClient` is still constructed exactly once, at module scope. Recovery re-runs
+`setAuth()` on that one client. There is no second client and no second WebSocket.
+
+### Why the UI could not simply read `isLoading`
+
+This is the subtle part, and it was found by testing rather than by reading.
+
+When `fetchAccessToken` changes identity, Convex's own cleanup runs:
+
+```ts
+setIsConvexAuthenticated(prev => prev ? false : null)
+```
+
+A previously failed state is already `false`. `false` is falsy, so it becomes `null` — and
+`null` is what `isLoading` is derived from. If the retried fetch also fails, nothing moves it
+off `null`. The dashboard shows "Authenticating with Convex…" forever.
+
+That is the exact misreport S-20 recorded, recreated by the retry meant to fix it. It was
+observed live: clicking Reconnect while Clerk was refusing returned the page to an
+indefinite spinner.
+
+So the UI does not infer failure from Convex's tri-state. The wrapper is the one place that
+actually observes the outcome, so it records it:
+
+```ts
+reportTokenFetch(token !== null);
+```
+
+A boolean. No token, claim, session identifier, or error text is retained anywhere. The
+dashboard tests `!isAuthenticated && tokenFetchFailed` **before** it tests `isLoading`,
+because after a failed re-attempt both are true and only one of them is the truth.
+
+### The three states, and why signed-out is a fourth
+
+`useConvexAuth()` reports `isLoading: false, isAuthenticated: false` for two unrelated
+situations: the user is signed out, and the user is signed in but no token could be
+obtained. Only Clerk's `isSignedIn` separates them. Collapsing them is what produced the
+original screen, and it matters beyond cosmetics: a revoked session must never be
+automatically re-attempted, because that is trying to restore an account state someone
+deliberately ended.
+
+```text
+!clerkLoaded                          → "Authenticating with Convex…"   (Clerk not ready)
+!isSignedIn                           → "Signed out"                    (no auto-recovery)
+!isAuthenticated && tokenFetchFailed  → LiveConnectionLost              (definitive failure)
+authLoading                           → "Authenticating with Convex…"   (genuinely in progress)
+!isAuthenticated                      → LiveConnectionLost              (token rejected/dropped)
+```
+
+`LiveConnectionLost` replaces the measurement table rather than sitting beside it. A
+disconnected monitoring surface must not leave readings on screen that a reader could take
+for current ones, and the synthetic write control is not rendered in that state at all. The
+backend is unchanged and would reject the call regardless; this is defence in depth, not the
+control itself.
+
+### Why the recovery cannot loop
+
+The listener fires on the offline → online edge only, and a previous value held in a ref is
+what makes it an edge rather than a condition. It then declines to act in three cases:
+Clerk is not loaded or not signed in; Convex is already authenticated; or Convex is
+genuinely still resolving with no observed failure. Only then does it call `reconnect()`
+once.
+
+`reconnect()` changes `attempt`. It does not change `browserReportsOffline`. The effect
+therefore cannot re-enter its own trigger. Measured directly: a tab sitting in the
+disconnected state made **zero network requests over 25 seconds**.
+
+There is one bound worth stating plainly. If the connection breaks *after* the online edge
+has already passed, no further edge arrives and nothing automatic happens. The manual
+Reconnect control exists for that case. Widening the trigger would mean arming a timer, and
+a timer is the beginning of the polling this phase exists to avoid.
+
+### What is still not proven
+
+The recovery path has **not** been exercised, because the test machine never produced an
+offline → online transition to exercise it. See `SECURITY_POSTURE.md` S-20 for the evidence
+and the machine-level cause. The two-tab claim from section 12 remains unproven.

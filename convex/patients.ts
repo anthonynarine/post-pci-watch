@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireSubject } from "./authz";
+import { recordAuditEvent, requireUserActor } from "./audit";
 import {
   DEMO_KEY,
   DEMO_PATIENT,
@@ -57,7 +58,8 @@ export const ensureMyDemoPatient = mutation({
     patientId: v.id("patients"),
   }),
   handler: async (ctx) => {
-    const ownerSubject = await requireSubject(ctx);
+    const actor = await requireUserActor(ctx);
+    const ownerSubject = actor.actorSubject;
 
     const existing = await ctx.db
       .query("patients")
@@ -66,9 +68,13 @@ export const ensureMyDemoPatient = mutation({
       )
       .unique();
 
+    // An existing patient gets no event. Its creation happened before audit existed, and
+    // writing a patient.created now would record an event at a time it did not occur.
     if (existing !== null) {
       return { created: false, patientId: existing._id };
     }
+
+    const now = Date.now();
 
     const patientId: Id<"patients"> = await ctx.db.insert("patients", {
       ...DEMO_PATIENT,
@@ -85,9 +91,14 @@ export const ensureMyDemoPatient = mutation({
         ingestedAt: ingestedAtFor(fixture),
         sourceDeviceId: fixture.sourceDeviceId,
         sourceType: fixture.sourceType,
+        origin: "seedFixture",
         isSynthetic: true,
       });
     }
+
+    // Same transaction as the inserts above: the patient and its creation event commit
+    // together or not at all. The fixture rows are covered by this one event.
+    await recordAuditEvent(ctx, actor, { eventType: "patient.created", patientId }, now);
 
     return { created: true, patientId };
   },

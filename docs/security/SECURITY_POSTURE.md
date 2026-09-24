@@ -24,7 +24,7 @@
 | Transport & browser hardening | **Resolved for development.** Headers and CSP deployed and verified end to end, including OAuth. Three production follow-ups open (S-17, S-18, S-19). |
 | Rate limiting / abuse control | **Absent.** |
 | Environment separation | **Absent.** Development instances only. |
-| Audit logging | **Absent.** |
+| Audit logging | **Partial (Phase 5.5).** Successful writes and client-declared workspace access are recorded atomically in an append-only `auditEvents` table. Denials, query reads, and tamper evidence are not covered. |
 | Retention, deletion, backup, IR | **Absent.** |
 
 The identity and authorization layer built in Phase 4 is genuinely sound and was verified by
@@ -75,7 +75,7 @@ Partial, Open (confirmed absent), Unknown (not determinable in this audit), N/A.
 | S-02 | Medium | Proven | Convex JWT lifetime is 3600s — revocation lag up to one hour | **Yes** |
 | S-03 | Medium | Open | No application-level rate limiting or abuse controls | **Yes** |
 | S-04 | Medium | Open | No environment separation; development instances only | **Yes** |
-| S-05 | Medium | Open | No audit logging of data access | **Yes** |
+| S-05 | Medium | **Partial** | Successful writes audited atomically; workspace access client-declared; denials and reads not durably audited; no tamper evidence | **Yes** |
 | S-06 | Medium | Open | No retention, deletion, or data-subject erasure path | **Yes** |
 | S-07 | Medium | Open | No backup, restore drill, or incident-response plan | **Yes** |
 | S-08 | Low | Unknown | Errors thrown as raw `Error`, not `ConvexError` | Partial |
@@ -90,7 +90,8 @@ Partial, Open (confirmed absent), Unknown (not determinable in this audit), N/A.
 | S-17 | Medium | Open | HSTS never served over a real HTTPS origin | **Yes** |
 | S-18 | Medium | Open | No CSP violation reporting endpoint | **Yes** |
 | S-19 | Low | Open | CSP still relies on `'unsafe-inline'`; no nonce | Partial |
-| S-20 | Medium | **Root cause proven** | Clerk `getToken` fails `clerk_offline` on a false `navigator.onLine`; no retry path makes it permanent | **Yes** |
+| S-21 | Low | Open | Identity key is `identity.subject`, not `identity.tokenIdentifier`; safe only while one issuer is trusted | No |
+| S-20 | Medium | **Partially remediated; deferred by owner; not closed** | Clerk `getToken` fails `clerk_offline` on a false `navigator.onLine`; failure now reported and bounded recovery added, but recovery is unverified and the trigger is this machine's Windows network services | **Yes** |
 
 ---
 
@@ -525,7 +526,7 @@ by default.
 
 ### S-05 — No audit logging of data access
 
-**Severity:** Medium · **Status:** Open · **Blocks PHI:** **Yes**
+**Severity:** Medium · **Status:** **Partial** (Phase 5.5, 2026-09-24) · **Blocks PHI:** **Yes**
 
 **File/function:** no logging exists in any function under `convex/`.
 
@@ -541,6 +542,34 @@ account read?" A PHI system must answer that question; this one cannot.
 written in the same transaction as the read path, plus a retention policy. Note the read
 path is a query, and queries cannot write — this requires deliberate design, not a one-line
 addition.
+
+#### Phase 5.5 — what is now recorded, and what is not
+
+`convex/audit.ts` and the `auditEvents` table (see `docs/concepts/phase-05-5-security-audit-foundation.md`):
+
+| Event | Written by | Guarantee |
+| --- | --- | --- |
+| `measurement.recorded` | `recordSyntheticHeartRate` | Same transaction as the measurement: both or neither |
+| `patient.created` | `ensureMyDemoPatient` | Same transaction as the patient and its fixtures; never back-dated for existing patients |
+| `patientWorkspace.accessed` | `recordPatientWorkspaceAccess`, called by the dashboard | Real actor, owned patient, one per workspace mount — but **declared by the client** |
+
+Actor identity is derived from the verified token in every case; no function accepts an actor,
+outcome, event type, timestamp, or synthetic flag as an argument (proven: all rejected by the
+validator). Rows hold references only — no values, names, emails, tokens, or payloads. There is
+no public update or delete.
+
+**Remaining, and why S-05 is Partial rather than Resolved:**
+
+- Client-declared workspace access can be skipped by a modified client; reads through the
+  query are not themselves recorded.
+- Query reruns are intentionally not logged as human access, and queries cannot write.
+- Denied operations are not durably audited: a throw rolls back the whole transaction,
+  including any audit row. Denials exist only in Convex's platform logs.
+- Audit rows are not cryptographically tamper-evident (no hash chain or external anchoring).
+- Deployment administrators remain privileged: an admin key can read, alter, or delete any row.
+- No roles or clinician assignments exist; the only access rule is ownership.
+- No retention policy exists for audit rows (see S-06).
+- No HIPAA compliance claim is made.
 
 ---
 
@@ -761,9 +790,11 @@ control that can enforce the banner at the top of this document.
 
 ### S-20 — Convex authentication lost permanently after a transient offline signal
 
-**Severity:** Medium · **Status:** **Root cause proven** · **Blocks PHI:** **Yes** ·
-**Discovered:** 2026-09-21 (Phase 5) · **Diagnosed:** 2026-09-21 · **Remediation:** proposed,
-not applied
+**Severity:** Medium · **Status:** **Partially remediated; NOT closed** · **Blocks PHI:**
+**Yes** · **Discovered:** 2026-09-21 (Phase 5) · **Diagnosed:** 2026-09-21 ·
+**Remediation items 1 and 2 applied:** 2026-09-23 · **Verification:** incomplete — see
+§ "2026-09-23 remediation and incomplete verification" below · **Deferred by the project
+owner:** 2026-09-24, as environmental to the test machine — see the 2026-09-24 audit entry
 
 **Original report:** "opening a second browser tab drops the first tab's Convex
 authentication." That description was **wrong about the cause**. The second tab is a
@@ -906,6 +937,178 @@ transient offline signal — a sleeping laptop, a VPN reconnect, a flaky Wi-Fi h
 permanently detaches the dashboard from its data source until the user reloads, while the
 page continues to look signed in.
 
+#### 2026-09-23 remediation and incomplete verification
+
+Items 1 and 2 of the proposed remediation were applied. Item 3 was honoured — the JWT
+lifetime is unchanged at 3600 seconds. Item 4 was investigated and the machine-level cause
+was found. **S-20 is not closed, and Phase 5's two-tab claim is still not made.**
+
+##### What changed in the application
+
+| File | Change |
+| --- | --- |
+| `src/components/convex/ConvexClientProvider.tsx` | `ConvexProviderWithClerk` replaced with `ConvexProviderWithAuth` plus a local copy of Clerk's token fetcher carrying one extra dependency, a recovery counter. Adds a recovery context, an offline to online edge listener, and a boolean record of whether the last token fetch produced a token. |
+| `src/features/monitoring/components/LiveConnectionLost.tsx` | New. The explicit disconnected state with a manual Reconnect control. |
+| `src/features/monitoring/components/MonitoringDataWorkspace.tsx` | Auth branch split from two states into four; the definitive-failure branch is tested before the loading branch. |
+| `src/features/monitoring/index.ts` | Barrel export for the new component. |
+
+Not changed: the JWT template and its 3600-second lifetime, `convex/auth.config.ts`, every
+Convex function, `proxy.ts`, and the CSP. **No backend authentication was weakened.** The
+`ConvexReactClient` is still constructed exactly once at module scope; recovery re-runs
+`setAuth()` on that single client rather than building another.
+
+##### A defect introduced by the fix, found by testing, then fixed
+
+The first version of the retry made things worse in one respect, and it is recorded here
+because reading the code would not have revealed it.
+
+Convex's cleanup runs `setIsConvexAuthenticated(prev => prev ? false : null)` when
+`fetchAccessToken` changes identity. An already-failed state is `false`, which is falsy, so
+it becomes `null` — the value `isLoading` is derived from. A retry that also failed
+therefore returned the page to an indefinite "Authenticating with Convex…", recreating the
+exact misreport this finding exists to remove.
+
+```text
+observed: click Reconnect while Clerk refuses
+       -> "Live monitoring disconnected"  replaced by
+       -> "Authenticating with Convex…"   and it stayed there
+```
+
+Fixed by not inferring failure from Convex's tri-state. The token fetcher — the one place
+that observes the outcome — records a boolean, and the dashboard tests it before it tests
+`isLoading`. Only whether a token came back is retained; no token, claim, session
+identifier, or error text is stored anywhere.
+
+##### Evidence gathered 2026-09-23
+
+Two dashboard tabs, one real Clerk session, dev server on `localhost:3000`.
+
+**The disconnected state reports correctly.**
+
+```text
+tab A: navigator.onLine false, same-origin fetch 200
+       -> "Live monitoring disconnected"
+       -> "No readings are being received."
+       -> "This browser reports itself offline…"
+       -> Reconnect control present, measurement table absent, write control absent
+       -> rowCount 0
+```
+
+**Clerk's refusal reproduced directly, with the session alive.**
+
+```text
+{ loaded: true, sessionStatus: "active", userPresent: true,
+  getToken: "throw", code: "clerk_offline",
+  navigatorOnLine: false }
+```
+
+**A failed re-attempt no longer misreports.** After the fix, clicking Reconnect while Clerk
+refuses settles back into the disconnected state with the offline explanation, not a
+spinner.
+
+**No retry loop, no polling.** A tab left sitting in the disconnected state issued **zero
+network requests over 25 seconds**.
+
+**The original "second tab" signature reproduced, and is now better characterised.** It is
+deterministic, and it is not about tab count:
+
+```text
+reload tab A -> tab A authenticated (9 rows), tab B disconnected
+reload tab B -> tab B authenticated (9 rows), tab A disconnected
+```
+
+Only the most recently loaded tab holds a usable token. A fresh page load **does** obtain a
+token even while `navigator.onLine` is false, so the offline flag alone is not sufficient to
+cause the failure. The failure needs two ingredients: something that forces a tab to re-mint
+a token (observed: another tab loading), and the false offline flag that makes re-minting
+impossible. The precise cross-tab mechanism inside Clerk was not established and is **not**
+claimed here.
+
+##### Item 4 resolved — the environmental trigger is a stopped Windows service
+
+```text
+Get-NetConnectionProfile          -> returns nothing (no network profile exists)
+Get-Service NlaSvc                -> Status: Stopped,  StartType: Manual
+Get-NetAdapter   Wi-Fi            -> Status: Up,  LinkSpeed: 72.2 Mbps
+Get-NetRoute 0.0.0.0/0            -> NextHop 192.168.86.1 via Wi-Fi
+```
+
+Network Location Awareness (`NlaSvc`) is the Windows service that builds connection profiles
+and reports connectivity state. With it stopped, Windows has no network profile, Chrome's
+`navigator.onLine` follows and reports `false`, and Clerk short-circuits on that flag —
+while the adapter is up and traffic flows normally.
+
+This is a machine configuration fault, not a defect in Chrome, Clerk, Convex, or this
+application. It explains why S-20 has been reproducible on this machine and would likely not
+reproduce elsewhere.
+
+##### What is NOT verified, and why
+
+Per the standing instruction not to fabricate an online state, no attempt was made to
+override `navigator.onLine` or Clerk's internal offline check.
+
+```text
+onLine sampled over 35 s while stopped    -> false at every sample
+'online'  events observed                 -> 0
+'offline' events observed                 -> 0
+```
+
+The browser never produced an offline to online transition, so **the bounded recovery path
+was never exercised.** It is implemented and reviewed, not proven.
+
+| Acceptance criterion | Result |
+| --- | --- |
+| One-tab baseline authenticated for at least 3 minutes | **Not run** — blocked |
+| Two dashboard tabs authenticated simultaneously | **FAILED** — only the most recently loaded tab holds a token |
+| Tab A writes, both tabs update | **Not run** — blocked |
+| Tab B writes, both tabs update | **Not run** — blocked |
+| Background/foreground alternation | **Not run** — blocked |
+| Survives beyond the 60–90 s window | **Not run** — blocked |
+| Repeat writes succeed | **Not run** — blocked |
+| Offline shows an explicit disconnected state | **PASSED** |
+| Restoring connectivity triggers exactly one attempt | **Not run** — no transition occurred |
+| Both subscriptions resume | **Not run** — blocked |
+| A signed-out session is not auto-restored | **PASSED by construction**; not exercised against a real sign-out |
+| No polling, `router.refresh()`, invalidation, navigation | **PASSED** — zero requests in 25 s idle |
+| No `Not authenticated` errors after successful recovery | **Not run** — no successful recovery occurred |
+
+`npm run lint`, `npx tsc --noEmit`, and `npm run build` (5/5 routes) are clean.
+
+##### Required before S-20 can be closed
+
+1. Start `NlaSvc` on the test machine (requires administrator) and confirm
+   `Get-NetConnectionProfile` returns a profile and `navigator.onLine` reads `true`.
+2. Re-run the full acceptance test above, including a real offline to online cycle.
+3. If two tabs still cannot hold authentication simultaneously once `navigator.onLine` is
+   truthful, the cross-tab Clerk token mechanism becomes a new finding in its own right —
+   it would mean the false offline flag was masking a second, independent defect.
+
+Until 1 and 2 pass, this finding stays open and Phase 5 stays open.
+
+---
+
+### S-21 — Identity key is `subject`, not `tokenIdentifier`
+
+**Severity:** Low · **Status:** Open · **Blocks PHI:** No · **Discovered:** 2026-09-24
+(Phase 5.5 review)
+
+**File/function:** `convex/authz.ts` `requireSubject`; `patients.ownerSubject`;
+`auditEvents.actorSubject`.
+
+**Evidence:** the Convex guidelines for this project name `identity.tokenIdentifier` (issuer
+plus subject) as the canonical identity key and advise against `identity.subject` alone.
+`subject` is unique only within one issuer. `convex/auth.config.ts` trusts exactly one
+issuer today, so no collision is currently possible.
+
+**Failure scenario:** a second issuer is added (another Clerk instance, or another provider)
+and it mints a `sub` equal to an existing Clerk user ID. That caller would pass
+`requireOwnedPatient` for the other user's records and be attributed their audit events.
+
+**Recommendation:** migrate ownership and actor fields to `tokenIdentifier` before
+`auth.config.ts` ever gains a second provider. Phase 5.5 kept `subject` deliberately, so
+`auditEvents.actorSubject` matches `patients.ownerSubject`; changing one without the other
+would make ownership and attribution disagree.
+
 
 ## 4. What the Tests Prove, and What They Do Not
 
@@ -971,7 +1174,8 @@ Nothing below has been implemented. Ordered by value per unit of effort.
 
 7. **S-04** — environment separation (Phase 16).
 8. **S-06** — retention and erasure path, including Clerk `user.deleted` cascade.
-9. **S-05** — durable access audit trail.
+9. **S-05** — Partial since Phase 5.5. Remaining: enforced read auditing, durable denial
+   records, tamper evidence, retention.
 10. **S-07** — backups plus a restore drill that actually restores.
 11. **S-11** — deploy-key handling policy and rotation procedure.
 12. **S-12** — verify cookie attributes on a real HTTPS deployment.
@@ -1071,5 +1275,107 @@ Nothing below has been implemented. Ordered by value per unit of effort.
 - **Changes to application behaviour:** none. Remediation proposed, not implemented.
 - **Verification:** `npm run lint` clean · `npx tsc --noEmit` clean · `npm run build`
   succeeds (5/5 routes).
+- **Standing statement:** synthetic data only; not authorized for PHI; no HIPAA compliance
+  claimed.
+
+### 2026-09-23 — S-20 remediation items 1 and 2 applied; verification incomplete
+
+- **Scope:** S-20 only. No other finding touched.
+- **Changed:** `src/components/convex/ConvexClientProvider.tsx` (ConvexProviderWithAuth with
+  a recovery-aware token fetcher, recovery context, offline-to-online edge listener, boolean
+  token-fetch outcome), `src/features/monitoring/components/LiveConnectionLost.tsx` (new),
+  `src/features/monitoring/components/MonitoringDataWorkspace.tsx` (four auth states),
+  `src/features/monitoring/index.ts` (barrel export).
+- **Not changed:** the `convex` JWT template and its 3600-second lifetime (S-02 stays open),
+  `convex/auth.config.ts`, every Convex function, `proxy.ts`, the CSP, and every other open
+  finding. No backend authentication was weakened. One `ConvexReactClient`, unchanged.
+- **Defect found during testing and fixed in the same session:** the first version of the
+  retry returned the page to an indefinite "Authenticating with Convex…" when a re-attempt
+  also failed, because Convex's cleanup turns an already-`false` auth state into `null`.
+  Replaced with an explicit boolean record of the token-fetch outcome, tested before
+  `isLoading`.
+- **Verification:** `npm run lint` clean · `npx tsc --noEmit` clean · `npm run build`
+  succeeds (5/5 routes). Disconnected-state reporting PASSED. No-polling/no-loop PASSED
+  (zero network requests over 25 s idle). **Two-tab authentication FAILED. Bounded recovery
+  NOT exercised** — the browser produced no offline-to-online transition in 35 s of sampling
+  and fired zero `online`/`offline` events.
+- **Environmental cause identified (diagnosis item 4):** `NlaSvc` (Network Location
+  Awareness) is Stopped on the test machine, so Windows holds no network connection profile
+  and Chrome reports `navigator.onLine === false` while Wi-Fi is Up at 72.2 Mbps with a valid
+  default route. Clerk short-circuits on that flag and throws `clerk_offline`. Not fixed —
+  starting the service requires administrator rights and is the machine owner's decision.
+- **Diagnostics:** browser-console probes only, removed from the page before completion. No
+  instrumentation was added to the repository. No raw JWT, cookie, header, secret, or patient
+  data was recorded, and no token was sent to any external decoder.
+- **Result:** S-20 **remains open**. Phase 5's two-tab reactivity claim **remains unproven**.
+- **Standing statement:** synthetic data only; not authorized for PHI; no HIPAA compliance
+  claimed.
+
+### 2026-09-24 — S-20 acceptance re-run blocked; deferred by the project owner
+
+- **Scope:** S-20 only. No code or configuration changed.
+- **Machine state observed (local time, UTC−4):**
+  - 12:34 — `NlaSvc` **Stopped** (start type Manual). `Get-NetConnectionProfile` empty.
+  - ~13:25 — owner started `NlaSvc`. Network List Manager then reported
+    `IsConnected = IsConnectedToInternet = True` at every 1 s sample for 3 minutes.
+  - The NetworkProfile log recorded **no network identification** between 12:29:42 and a
+    Wi-Fi reconnect at 14:10:16, when the Wi-Fi interface reached the "Identified" state.
+  - After 14:10:16, Network List Manager still enumerated **zero connected networks** and
+    `Get-NetConnectionProfile` stayed empty, while reporting internet connectivity. Windows
+    network state is internally inconsistent on this machine.
+- **Application behaviour observed (owner's screen, not instrumented):** with `NlaSvc`
+  running, the dashboard authenticated and synthetic writes appeared through the
+  subscription, then repeatedly dropped to `LiveConnectionLost` **with the "browser reports
+  itself offline" line shown**. Reconnect or a reload restored the feed each time. The
+  disconnected state again hid historical readings as designed.
+- **Open question, unresolved:** Reconnect was reported to succeed while the offline line was
+  displayed. Either `navigator.onLine` had returned to `true` without the automatic recovery
+  restoring the feed, or Clerk issued a token despite a false flag. The flag was not read
+  directly, so neither is established.
+- **Not run:** the Chrome extension was disconnected, so `navigator.onLine`, `online`/`offline`
+  events, recovery-attempt counts, and Clerk/Convex state could not be recorded. None of the
+  nine acceptance steps was executed.
+- **Unrelated, noted:** a React hydration warning on `<body>` came from the ColorZilla browser
+  extension injecting `cz-shortcut-listen`. Not an application defect; no code changed.
+- **Decision:** the project owner deferred S-20 as environmental to this machine and chose to
+  proceed with the roadmap. **S-20 is not closed.** Close-out conditions are unchanged.
+  Recommended machine fix: `Set-Service NlaSvc -StartupType Automatic`, then reboot. Re-run on
+  a machine with a healthy network stack before any claim of two-tab reactivity or of
+  verified recovery.
+- **Standing statement:** synthetic data only; not authorized for PHI; no HIPAA compliance
+  claimed.
+
+### 2026-09-24 — Phase 5.5: security, provenance, and audit foundation
+
+- **Scope:** S-05 (partially remediated), measurement provenance, new finding S-21. S-20 and
+  every other finding untouched.
+- **Changed:** `convex/schema.ts` (`auditEvents` table, `measurementOrigin`, `sourceType`
+  widened with `seedFixture`), `convex/audit.ts` (new), `convex/measurements.ts`,
+  `convex/patients.ts`, `convex/fixtures.ts`,
+  `src/features/monitoring/hooks/useRecordPatientWorkspaceAccess.ts` (new),
+  `src/features/monitoring/components/SyntheticActivityHistory.tsx` (new),
+  `MonitoringDataWorkspace.tsx`, `src/features/monitoring/index.ts`.
+- **Provenance correction:** the 36 seed rows labelled `simulatedWearable` / `sim-wearable-01`
+  claimed a simulator that has never existed. Relabelled `seedFixture` / `seed-fixture`.
+- **Migration:** staged. Before: 65 rows, 65 missing `origin`, 36 stale simulator labels.
+  After: 36 `seedFixture`, 29 `userManualControl`, 0 `systemProducer`, 0 missing, 0 stale.
+  Re-run changed nothing. `origin` then made required, and the schema push was accepted. The
+  temporary migration functions were removed and confirmed absent from the deployment.
+- **Verification (injected identities, dev deployment):** all passed. Signed-out audit
+  read, audit write, and heart-rate write → `Not authenticated`. Actor, actor type, outcome,
+  synthetic flag, event type, timestamp, origin, and source type as arguments →
+  `ArgumentValidationError` (extra field). Malformed and wrong-table IDs rejected; malformed
+  correlation IDs rejected. User A → B's patient → `Patient not found`, no event written.
+  Each account lists only its own events (A 2, B 1, C 1 of 4 total). Three identical
+  workspace-access calls → one row. Valid heart rate → +1 measurement, +1 event. 250 bpm,
+  5 bpm, string value, and cross-owner writes → +0/+0. `patient.created` written once for a
+  new user; none for existing patients. Stored rows contain no value, name, email, token, or
+  payload field. Cross-owner measurement isolation intact.
+- **Not verified:** the dashboard panel and the access effect in a real browser session
+  (Chrome extension disconnected); owner-confirmed separately if at all — see `PHASE_LOG.md`.
+- **Test data added:** synthetic user `user_CCC` and its demo patient, created to exercise
+  `patient.created`.
+- **Verification commands:** `npx tsc --noEmit` clean · `npm run lint` clean ·
+  `npm run build` succeeds (8 routes).
 - **Standing statement:** synthetic data only; not authorized for PHI; no HIPAA compliance
   claimed.

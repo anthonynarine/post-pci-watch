@@ -9,7 +9,8 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
 
 ## Project state
 
-- **Current phase: Phase 5 — Realtime Data.**
+- **Current phase: Phase 5.5 — Security, Provenance, and Audit Foundation** (inserted by the
+  project owner outside the roadmap; code complete, stopped at its end). Phase 6 has not begun.
 - Phase 1 status: code complete. Its mastery check has not been answered in the learner's
   own words and stays open in `docs/PHASE_LOG.md`.
 - Phase 2 status: code complete and verified end to end. Its mastery check is also still
@@ -18,7 +19,29 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
 - Phase 4 status: code complete and verified. Its mastery check is also still open.
 - Phase 5 status: code complete. One manual control records a synthetic heart rate and the
   subscribed table updates without a refresh. Single-client reactivity and cross-client push
-  are proven; the two-browser-tab test is blocked by S-20 and is not claimed.
+  are proven; the two-browser-tab test is **still blocked by S-20 and is not claimed.**
+  S-20 remediation items 1 and 2 were applied on 2026-09-23 — the dashboard now reports a
+  definitive authentication failure instead of an endless "Authenticating with Convex…", and
+  a bounded one-shot recovery fires on a genuine offline-to-online transition. Neither the
+  two-tab test nor the recovery path passed verification: the test machine's `NlaSvc` service
+  is stopped, so `navigator.onLine` is permanently false and Clerk refuses to mint tokens.
+  Close-out conditions are in `docs/security/SECURITY_POSTURE.md` under S-20.
+  On 2026-09-24 the project owner **deferred S-20 as environmental** to the test machine.
+  S-20 stays open; the two-tab claim stays unclaimed. The Phase 5 mastery check is
+  **unanswered by owner decision**; the owner waived hard rule 1 to begin Phase 5.5.
+- Phase 5.5 status: code complete and verified by injected-identity tests (2026-09-24).
+  Append-only `auditEvents` written atomically with successful writes; one client-declared
+  workspace-access event per workspace mount; owner-scoped "Synthetic activity history"
+  panel; measurement `origin` required and fixture provenance corrected. S-05 is **Partial**,
+  not resolved; new finding S-21. The panel and access effect are not yet observed in a live
+  browser.
+- 2026-09-24: the owner **waived the Phase 5 and Phase 5.5 mastery checks** to prioritise
+  finishing the application. Waived, not answered. Phase 6 is unblocked by that decision.
+- Outside the roadmap: a public teaching library at `/learn` (`src/features/learning/`).
+  It is not a phase and does not advance or close one. Add articles as described in
+  `docs/concepts/teaching-section.md` §5. Every article's claims are verified against the
+  installed versions and official docs. When a Convex, Clerk, or Next.js upgrade lands,
+  recheck `src/features/learning/data/` and the article's `verifiedAgainst`.
 - Not yet permitted in the codebase: AI providers, PhysioNet, Synthea. Within Clerk: no
   organizations, roles, or webhooks. Within Convex: no actions, no scheduled functions, no
   HTTP endpoints.

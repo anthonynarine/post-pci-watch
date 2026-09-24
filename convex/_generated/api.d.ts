@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as audit from "../audit.js";
 import type * as authz from "../authz.js";
 import type * as fixtures from "../fixtures.js";
 import type * as measurements from "../measurements.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  audit: typeof audit;
   authz: typeof authz;
   fixtures: typeof fixtures;
   measurements: typeof measurements;

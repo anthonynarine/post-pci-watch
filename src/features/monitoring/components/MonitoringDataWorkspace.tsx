@@ -2,16 +2,21 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { DatabaseZap } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
 import type { Doc } from "@convex/_generated/dataModel";
+import { useConvexConnectionRecovery } from "@/components/convex/ConvexClientProvider";
 import { Card } from "@/components/ui/Card";
 
+import { useRecordPatientWorkspaceAccess } from "../hooks/useRecordPatientWorkspaceAccess";
 import type { Measurement } from "../types/monitoring";
+import { LiveConnectionLost } from "./LiveConnectionLost";
 import { RecentMeasurements } from "./RecentMeasurements";
 import { RecordSyntheticHeartRate } from "./RecordSyntheticHeartRate";
+import { SyntheticActivityHistory } from "./SyntheticActivityHistory";
 
 /**
  * The dashboard's only Client Component. It is one because `useQuery` holds a live WebSocket
@@ -72,7 +77,15 @@ export function MonitoringDataWorkspace() {
   // window after page load in which the session exists but the token has not been fetched
   // and handed to the Convex client yet. Firing a protected query during that window sends
   // it unauthenticated, and the server correctly rejects it.
+  //
+  // Both hooks are read because neither alone distinguishes the three states this component
+  // has to tell apart. Convex reports `isLoading: false, isAuthenticated: false` for two
+  // very different situations — "the user is signed out" and "the user is signed in but
+  // token acquisition failed". Only Clerk's `isSignedIn` separates them, and collapsing them
+  // is exactly what produced S-20's permanent "Authenticating with Convex…" screen.
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
+  const { tokenFetchFailed } = useConvexConnectionRecovery();
 
   // "skip" keeps the subscription declared but closed until Convex itself reports ready.
   const patient = useQuery(api.patients.getMyDemoPatient, isAuthenticated ? {} : "skip");
@@ -83,15 +96,53 @@ export function MonitoringDataWorkspace() {
     patient ? { patientId: patient._id, limit: RECENT_LIMIT } : "skip",
   );
 
+  // Called unconditionally, as hooks must be; it does nothing until a patient has loaded
+  // through an authenticated subscription.
+  useRecordPatientWorkspaceAccess(patient?._id);
+
   const ensureMyDemoPatient = useMutation(api.patients.ensureMyDemoPatient);
   const [creating, setCreating] = useState(false);
 
-  if (authLoading || !isAuthenticated) {
+  // Clerk has not reported yet. Nothing below can be decided until it has.
+  if (!clerkLoaded) {
     return (
       <WorkspaceNotice title="Authenticating with Convex…">
         Waiting for a verified token before opening any protected subscription.
       </WorkspaceNotice>
     );
+  }
+
+  // Signed out is not a connection failure and must never be recovered from automatically.
+  // The route is protected, so this is normally only the instant after a sign-out.
+  if (!isSignedIn) {
+    return (
+      <WorkspaceNotice title="Signed out">
+        This session has ended. Sign in again to reopen the monitoring subscription.
+      </WorkspaceNotice>
+    );
+  }
+
+  // State 3 — Clerk holds a live session but no token reached Convex. This branch is tested
+  // BEFORE the loading branch on purpose: after a failed re-attempt Convex reports
+  // isLoading: true even though authentication has definitively failed, and reporting that
+  // as progress is the S-20 misreport this remediation exists to remove.
+  if (!isAuthenticated && tokenFetchFailed) {
+    return <LiveConnectionLost />;
+  }
+
+  // State 1 — genuinely in progress: Convex has not yet heard back about the token.
+  if (authLoading) {
+    return (
+      <WorkspaceNotice title="Authenticating with Convex…">
+        Waiting for a verified token before opening any protected subscription.
+      </WorkspaceNotice>
+    );
+  }
+
+  // Resolved, and the answer was no — a token was obtained but the deployment rejected it,
+  // or the connection dropped after authentication.
+  if (!isAuthenticated) {
+    return <LiveConnectionLost />;
   }
 
   if (patient === undefined) {
@@ -143,6 +194,7 @@ export function MonitoringDataWorkspace() {
         <WorkspaceNotice title="No measurements recorded">
           {patient.name} exists, but no observations are stored for this patient yet.
         </WorkspaceNotice>
+        <SyntheticActivityHistory />
       </div>
     );
   }
@@ -154,6 +206,7 @@ export function MonitoringDataWorkspace() {
     <div className="space-y-4">
       <RecordSyntheticHeartRate patientId={patient._id} />
       <RecentMeasurements measurements={measurements.map(toMeasurementRow)} />
+      <SyntheticActivityHistory />
     </div>
   );
 }

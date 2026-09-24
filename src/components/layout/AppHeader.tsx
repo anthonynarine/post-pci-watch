@@ -1,9 +1,16 @@
 // # Filename: src/components/layout/AppHeader.tsx
 import Link from "next/link";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
-import { Activity, FlaskConical } from "lucide-react";
+import { Activity, FlaskConical, GraduationCap } from "lucide-react";
 
+import { NavLink } from "@/components/layout/NavLink";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+
+/**
+ * The application header, a Server Component. Clerk's <Show> resolves the signed-in state on
+ * the server; the two links that need the current URL for their active state are the small
+ * NavLink Client Components.
+ */
 
 export function AppHeader() {
   return (
@@ -26,13 +33,20 @@ export function AppHeader() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-3">
+        {/* Wraps onto a second line on narrow screens rather than widening the page. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
             <FlaskConical aria-hidden="true" className="size-3.5" />
             Synthetic data
           </span>
 
           <ThemeToggle />
+
+          {/* Public for everyone: the teaching library holds no patient data. */}
+          <NavLink href="/learn">
+            <GraduationCap aria-hidden="true" className="size-3.5" />
+            Learn
+          </NavLink>
 
           <Show when="signed-out">
             <SignInButton mode="redirect" forceRedirectUrl="/dashboard">
@@ -54,12 +68,7 @@ export function AppHeader() {
           </Show>
 
           <Show when="signed-in">
-            <Link
-              href="/dashboard"
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              Dashboard
-            </Link>
+            <NavLink href="/dashboard">Dashboard</NavLink>
             <UserButton />
           </Show>
         </div>
