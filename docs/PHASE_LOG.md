@@ -531,6 +531,28 @@ owned domain; recorded as S-22); merge to `main` and deploy `main` on Vercel.
   and the Clerk development secret key were pasted into chat. The owner chose to proceed and
   rotate later. Recorded under S-11; rotate both before any wider audience.
 
+## Phase 17 — Demo Polish
+
+**Goal:** tell the demo's story quickly and remove anything on screen that is not true.
+
+**Notes**
+
+- 2026-09-25 — Removed the static Device and connectivity card (fake battery, sync, and
+  connection state that contradicted the live simulator and the real connection screen) and the
+  now-unused static vitals, events, measurements, and device data. The synthetic-data notice no
+  longer says "not connected to any wearable" or shows a fixed March snapshot time. The recovery
+  timeline is labelled illustrative, static page content.
+
+- 2026-09-25 — Window summary gains a per-vital trend sparkline: `summarizeWindow` returns at
+  most 40 chronological points, each the mean of consecutive readings (verified: 24 readings →
+  24 points; 184 → 37). Plain SVG, single series, muted line with accent latest point, crosshair
+  tooltip on hover; the table's numbers remain the accessible alternative. **Not yet visually
+  checked in a browser** — the automation extension disconnected before the window held data.
+
+- 2026-09-25 — Home page gains a five-step "How it works" flow. README rewritten: it previously
+  claimed clinician-reviewed AI summaries, which were never built; it now has an architecture
+  diagram and an explicit built / not-built table.
+
 ## Outside the Roadmap — Teaching Section
 
 Not a phase. It adds no technology, no dependency, and no backend code, and it neither

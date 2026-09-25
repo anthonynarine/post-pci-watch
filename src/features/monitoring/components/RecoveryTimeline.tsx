@@ -15,7 +15,7 @@ export function RecoveryTimeline({ milestones }: { milestones: RecoveryMilestone
   return (
     <Card
       title="Recovery timeline"
-      description="Post-PCI milestones recorded for this synthetic record."
+      description="Illustrative milestones for this fictional record. Static page content, not stored data."
       icon={Clock}
     >
       <ol className="space-y-4">

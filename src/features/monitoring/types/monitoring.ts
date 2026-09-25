@@ -76,16 +76,3 @@ export type MonitoringEvent = {
   detectedAt: string;
   severity: ObservationStatus;
 };
-
-export type ConnectionState = "connected" | "degraded" | "offline";
-
-export type MonitoringDevice = {
-  id: string;
-  model: string;
-  connection: ConnectionState;
-  connectionLabel: string;
-  lastSyncAt: string;
-  batteryPercent: number;
-  sampleRate: string;
-  status: ObservationStatus;
-};

@@ -9,7 +9,8 @@ Where the two disagree, `docs/PROJECT_SOURCE.md` wins.
 
 ## Project state
 
-- **Current phase: Phase 17 — Demo Polish** (next). Phase 16 deployed and verified end to end
+- **Current phase: Phase 17 — Demo Polish** (code complete 2026-09-25; the trend sparkline
+  awaits a visual check). Phase 16 deployed and verified end to end
   on 2026-09-24: Vercel + Convex production `rosy-pigeon-94` + Clerk development instance
   (S-22). The Convex deploy key and Clerk secret key were exposed in a session transcript and
   must be rotated (S-11). Phases 8, 9, 11–15 were skipped under the finish scope.

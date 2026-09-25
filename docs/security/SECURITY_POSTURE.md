@@ -1412,3 +1412,15 @@ Nothing below has been implemented. Ordered by value per unit of effort.
   `npm run build` succeeds (8 routes).
 - **Standing statement:** synthetic data only; not authorized for PHI; no HIPAA compliance
   claimed.
+
+### 2026-09-25 — S-20: instrumented observation of Reconnect with the offline flag set
+
+- **Observed (browser automation, local dev):** at 00:04:15Z the dashboard's Reconnect restored
+  the feed while `navigator.onLine` read **false**. The page dropped again about 25 s later, and a
+  second Reconnect did **not** restore it. Windows still reported no network profile.
+- **Resolves the 2026-09-24 open question in part:** Clerk *can* return a token while the flag is
+  false. **Hypothesis, not proven:** the manual re-attempt is answered from Clerk's token cache,
+  while Convex's scheduled refresh requests a fresh token (`forceRefreshToken: true` →
+  `skipCache`), which Clerk refuses offline. Consistent with every observation so far; would be
+  confirmed by instrumenting `forceRefreshToken` on each fetch.
+- **No code changed.** S-20 remains open and deferred.

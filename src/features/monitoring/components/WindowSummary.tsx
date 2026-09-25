@@ -10,6 +10,7 @@ import type { Doc, Id } from "@convex/_generated/dataModel";
 import { Card } from "@/components/ui/Card";
 
 import { useNow } from "../hooks/useNow";
+import { Sparkline } from "./Sparkline";
 
 /**
  * Count, min, mean, max, and latest per vital over the last 5 minutes or the last hour.
@@ -48,7 +49,7 @@ export function WindowSummary({ patientId }: { patientId: Id<"patients"> }) {
   return (
     <Card
       title="Window summary"
-      description="Per-vital statistics over a recent window. Descriptive only; no thresholds are applied."
+      description="Per-vital statistics and trend over a recent window. Descriptive only; no thresholds are applied."
       icon={ChartNoAxesColumn}
       action={
         <div role="group" aria-label="Time window" className="flex shrink-0 gap-1">
@@ -75,7 +76,7 @@ export function WindowSummary({ patientId }: { patientId: Id<"patients"> }) {
         </p>
       ) : (
         <div className="-mx-1 overflow-x-auto">
-          <table className="w-full min-w-[30rem] border-collapse text-left text-sm">
+          <table className="w-full min-w-[38rem] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs font-medium text-foreground-muted">
                 <th scope="col" className="px-1 py-2">Vital</th>
@@ -85,6 +86,7 @@ export function WindowSummary({ patientId }: { patientId: Id<"patients"> }) {
                 <th scope="col" className="px-1 py-2 text-right">Max</th>
                 <th scope="col" className="px-1 py-2 text-right">Latest</th>
                 <th scope="col" className="px-1 py-2">Unit</th>
+                <th scope="col" className="px-1 py-2">Trend</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border font-mono text-xs">
@@ -99,6 +101,13 @@ export function WindowSummary({ patientId }: { patientId: Id<"patients"> }) {
                   <td className="px-1 py-2 text-right text-foreground">{vital.max}</td>
                   <td className="px-1 py-2 text-right text-foreground">{vital.latest}</td>
                   <td className="px-1 py-2 font-sans text-foreground-muted">{vital.unit}</td>
+                  <td className="px-1 py-2">
+                    <Sparkline
+                      points={vital.trend}
+                      label={TYPE_LABELS[vital.measurementType]}
+                      unit={vital.unit}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

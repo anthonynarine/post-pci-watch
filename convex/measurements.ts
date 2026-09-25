@@ -189,6 +189,32 @@ export const getCurrentVitals = query({
 /** Per-vital ceiling on one window read. An hour of simulator output is 720 per vital. */
 const MAX_WINDOW_ROWS_PER_VITAL = 1000;
 
+/** A sparkline needs a shape, not every reading: at most this many points per vital. */
+const MAX_TREND_POINTS = 40;
+
+/**
+ * Oldest-first trend: consecutive readings averaged into at most MAX_TREND_POINTS groups. Each
+ * point is the mean time and mean value of its group, so no reading is dropped, only merged.
+ */
+function downsample(rows: Array<{ observedAt: number; value: number }>) {
+  const chronological = [...rows].reverse();
+  const groupSize = Math.max(1, Math.ceil(chronological.length / MAX_TREND_POINTS));
+  const points = [];
+
+  for (let start = 0; start < chronological.length; start += groupSize) {
+    const group = chronological.slice(start, start + groupSize);
+    const mean = (pick: (row: (typeof group)[number]) => number) =>
+      group.reduce((total, row) => total + pick(row), 0) / group.length;
+
+    points.push({
+      at: Math.round(mean((row) => row.observedAt)),
+      value: Math.round(mean((row) => row.value) * 10) / 10,
+    });
+  }
+
+  return points;
+}
+
 /**
  * Count, min, mean, max, and latest for each live vital since `since`.
  *
@@ -214,6 +240,7 @@ export const summarizeWindow = query({
         mean: v.number(),
         max: v.number(),
         latest: v.number(),
+        trend: v.array(v.object({ at: v.number(), value: v.number() })),
       }),
     ),
   }),
@@ -254,6 +281,7 @@ export const summarizeWindow = query({
         mean: Math.round((sum / values.length) * 10) / 10,
         max: Math.max(...values),
         latest: rows[0].value,
+        trend: downsample(rows),
       });
     }
 

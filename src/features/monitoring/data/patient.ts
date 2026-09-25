@@ -1,9 +1,7 @@
 // # Filename: src/features/monitoring/data/patient.ts
 import type { SyntheticPatient } from "../types/monitoring";
 
-/** Every timestamp on the dashboard is read against this fixed synthetic clock. */
-export const SNAPSHOT_AT = "2026-03-14 14:32:08";
-
+/** Fictional background for the demo patient. Static page content, not stored data. */
 export const SYNTHETIC_PATIENT: SyntheticPatient = {
   name: "Rosa M. Delgado",
   recordId: "SYN-0001",
